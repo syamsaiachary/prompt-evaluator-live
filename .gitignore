@@ -1,0 +1,65 @@
+# ── Virtual Environment ────────────────────────
+venv/
+.venv/
+env/
+.env/
+ENV/
+*/bin/activate
+*/pyvenv.cfg
+
+# ── Environment Variables ──────────────────────
+.env
+
+
+# ── Python ────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.pycache
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# ── Project Specific ──────────────────────────
+output/                    # generated Excel files
+evaluated_results.xlsx
+.eval_cache/
+checkpoints.db             # LangGraph SQLite checkpoint file
+checkpoints.db-shm
+checkpoints.db-wal
+submissions.xlsx            # sensitive submission data
+*.csv                      # all CSV files (contain PII)
+
+# ── Scenarios (optional — uncomment to track PDFs in git)
+# scenarios/
+
+# ── IDE ───────────────────────────────────────
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
+
+# ── Logs ──────────────────────────────────────
+*.log
+logs/
+
+# ── Testing ───────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+
+# LibreOffice / MS Office lock files
+~$*
+*.xlsx#
+*~lock.*
+\#*~
+temp_submissions.xlsx  
