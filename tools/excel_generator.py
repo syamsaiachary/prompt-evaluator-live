@@ -17,9 +17,8 @@ from config import GRADE_COLOURS, OUTPUT_PATH
 def _grade(total: int | None) -> str:
     if total is None: return "Flagged"
     if total >= 40: return "Excellent"
-    if total >= 30: return "Good"
-    if total >= 20: return "Needs Improvement"
-    return "Poor"
+    if total >= 35: return "Good"
+    return "Needs Improvement"
 
 
 @tool
