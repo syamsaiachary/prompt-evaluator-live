@@ -28,7 +28,7 @@ RPM_LIMIT = 15
 
 # CSV column names (must match exactly)
 DOMAIN_COLUMN  = "Choose your domain below"
-PROMPT_COLUMN  = "Request your response"
+PROMPT_COLUMN  = "Submit your Prompt"
 
 # File paths
 CSV_PATH       = "submissions.xlsx"

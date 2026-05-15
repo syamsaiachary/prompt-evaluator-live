@@ -24,6 +24,9 @@ def load_csv_node(state: OverallState) -> dict:
     else:
         df = pd.read_csv(path)
 
+    # Strip whitespace from column names to avoid matching issues
+    df.columns = df.columns.str.strip()
+
     # ── Convert every row to safe primitives ──────────────────────────────
     rows = [_safe_row(row) for row in df.to_dict(orient="records")]
 
