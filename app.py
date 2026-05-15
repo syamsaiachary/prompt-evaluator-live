@@ -162,15 +162,12 @@ header[data-testid="stHeader"] { display: none !important; }
 [data-testid="stProgressBar"] > div > div {
     background: linear-gradient(90deg, #F4610A, #FF8040) !important;
     border-radius: 2px !important;
-
 }
-
 [data-testid="stProgressBar"] > div {
     background: #1A1A1A !important;
     border-radius: 2px !important;
     height: 4px !important;
 }
-
 .stProgress {
     padding-left: 24px !important;
     padding-top: 24px;
@@ -259,6 +256,24 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# ─── HELPERS ──────────────────────────────────────────────────────────────────
+def count_cached_rows(total_rows: int) -> set:
+    """
+    Return the set of row indices that already have a cache file.
+    Cache files are named row_NNNN.json (zero-padded 4 digits).
+    This is used to pre-seed the progress bar on retry runs so the
+    bar starts from the correct position rather than from zero.
+    """
+    cache_dir = getattr(config, "CACHE_DIR", ".eval_cache")
+    cached = set()
+    if not os.path.exists(cache_dir):
+        return cached
+    for i in range(total_rows):
+        if os.path.exists(os.path.join(cache_dir, f"row_{i:04d}.json")):
+            cached.add(i)
+    return cached
+
+
 # ─── CONTENT ──────────────────────────────────────────────────────────────────
 st.markdown('<div class="indium-content">', unsafe_allow_html=True)
 
@@ -314,12 +329,12 @@ with open(temp_input_path, "wb") as f:
 
 # ── File info strip ───────────────────────────────────────────────────────────
 try:
-    df_preview  = pd.read_excel(temp_input_path)
-    total_rows  = len(df_preview)
-    col_count   = len(df_preview.columns)
+    df_preview = pd.read_excel(temp_input_path)
+    total_rows = len(df_preview)
+    col_count  = len(df_preview.columns)
 except Exception:
-    total_rows  = 1
-    col_count   = 0
+    total_rows = 1
+    col_count  = 0
 
 st.markdown(f"""
 <div style="display:flex; gap:24px; align-items:center; margin-bottom:28px;
@@ -356,15 +371,30 @@ if start:
     </div>
     """, unsafe_allow_html=True)
 
-    progress_bar  = st.progress(0, text=f"Initialising · 0 / {total_rows} rows")
-    completed_rows = set()
-    scrollable    = st.container(height=380)
-    log_box       = scrollable.empty()
+    # ── Pre-count cached rows so the progress bar starts correctly ──
+    # On a retry run, many rows are already cached. Without this, the
+    # bar would start at 0 and only count rows processed this session,
+    # making it look like we're starting from scratch every time.
+    completed_rows = count_cached_rows(total_rows)
+    cached_count   = len(completed_rows)
+
+    initial_pct = min(cached_count / max(total_rows, 1), 1.0)
+
+    if cached_count > 0:
+        progress_bar = st.progress(
+            initial_pct,
+            text=f"Resuming · {cached_count} already cached · {cached_count} / {total_rows} rows"
+        )
+    else:
+        progress_bar = st.progress(0, text=f"Initialising · 0 / {total_rows} rows")
+
+    scrollable = st.container(height=380)
+    log_box    = scrollable.empty()
 
     start_time = time.perf_counter()
     logs: list[str] = []
 
-    # ── Subprocess backend (matches latest main.py pattern) ──────────────────
+    # ── Subprocess ───────────────────────────────────────────────────────────
     process = subprocess.Popen(
         [sys.executable, "-u", "-X", "utf8", "main.py", "--csv", temp_input_path],
         stdout=subprocess.PIPE,
@@ -384,11 +414,17 @@ if start:
 
         logs.append(msg)
 
+        # Track newly completed rows from live log output.
+        # Cache HITs and fresh evaluations both count — the set prevents
+        # double-counting if the same row index appears more than once.
         match = re.search(r"Row (\d+)", msg)
         if match and any(x in msg for x in ["Cache HIT", "total=", "FLAGGED", "Failed writing cache", "Cache read failed"]):
             completed_rows.add(int(match.group(1)))
             pct = min(len(completed_rows) / max(total_rows, 1), 1.0)
-            progress_bar.progress(pct, text=f"Evaluating · {len(completed_rows)} / {total_rows} rows")
+            progress_bar.progress(
+                pct,
+                text=f"Evaluating · {len(completed_rows)} / {total_rows} rows"
+            )
 
         display = logs[-1000:] if len(logs) > 1000 else logs
         log_box.code("\n".join(display), language="log")
