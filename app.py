@@ -268,7 +268,26 @@ hr { border: none !important; border-top: 1px solid #1A1A1A !important; margin: 
     0%, 100% { opacity: 1; transform: scale(1); }
     50%       { opacity: 0.4; transform: scale(0.8); }
 }
+/* Prevent browser save-password prompt on API key field */
+[data-testid="stTextInput"] input {
+    autocomplete: off;
+}
 </style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<script>
+    // Runs after Streamlit renders — finds the API key input and
+    // sets autocomplete=off so browsers don't offer to save it.
+    const observer = new MutationObserver(() => {
+        const inputs = document.querySelectorAll('[data-testid="stTextInput"] input');
+        inputs.forEach(el => {
+            el.setAttribute('autocomplete', 'off');
+            el.setAttribute('data-form-type', 'other');
+        });
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+</script>
 """, unsafe_allow_html=True)
 
 

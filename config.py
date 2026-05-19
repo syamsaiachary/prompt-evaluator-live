@@ -19,7 +19,7 @@ WORKER_1 = {
     "provider": "gemini",
     "model": "gemma-4-31b-it",
     "api_key": get_api_key(),   
-    "semaphore_limit": 8,                
+    "semaphore_limit": 7,                
 }
 
 # Worker 2 — processes second half of CSV
@@ -27,7 +27,7 @@ WORKER_2 = {
     "provider": "gemini",
     "model": "gemma-4-26b-a4b-it",
     "api_key": get_api_key(),  
-    "semaphore_limit": 8,
+    "semaphore_limit": 7,
 }
 
 # Global LLM rate limit (requests per minute)
