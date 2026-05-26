@@ -13,12 +13,14 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 from graph import build_graph
-from config import CSV_PATH
+from config import CSV_PATH, WORKER_1, WORKER_2
+from nodes.worker_pool import init_pool
+
 
 async def run(csv_path: str) -> None:
     import config
     config.CSV_PATH = csv_path
-    
+
     os.makedirs(config.CACHE_DIR, exist_ok=True)
 
     start = time.perf_counter()
@@ -27,7 +29,12 @@ async def run(csv_path: str) -> None:
     print("=" * 60)
 
     graph = build_graph()
-    await graph.ainvoke({"half1": [], "half2": [], "results": [], "rows": []})
+
+    # The pool lives for the entire run and is shared by all evaluate_node
+    # invocations via get_pool().  The async context manager starts the two
+    # background dispatcher tasks and stops them cleanly when the run ends.
+    async with init_pool(WORKER_1, WORKER_2):
+        await graph.ainvoke({"half1": [], "half2": [], "results": [], "rows": []})
 
     elapsed = time.perf_counter() - start
     mins, secs = divmod(int(elapsed), 60)
