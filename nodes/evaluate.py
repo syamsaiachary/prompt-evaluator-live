@@ -16,7 +16,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from state import WorkerState
 from tools.scenario_loader import get_scenario_context
 from prompts.evaluator_system_prompt import SYSTEM_PROMPT
-from config import WORKER_1, WORKER_2, DOMAIN_COLUMN, PROMPT_COLUMN, RPM_LIMIT, CACHE_DIR
+from config import WORKER_1, WORKER_2, DOMAIN_COLUMN, PROMPT_COLUMN, CACHE_DIR
 
 
 # ── Lazy asyncio primitives ───────────────────────────────────
@@ -45,54 +45,48 @@ def _get_primitives() -> dict:
     return _primitives
 
 
-# ── Strict token-bucket rate limiter ─────────────────────────
+# ── Sliding Window Rate Limiter ──────────────────────────────
 #
-# Strategy: enforce a MINIMUM GAP between consecutive requests per worker.
-#   RPM_LIMIT = 15  →  min_gap = 60 / 15 = 4.0 s per worker
+# Strategy: Tracks exact network launch times. Never allows the
+# queue to exceed worker config `rpm_limit` launches in a rolling 60s.
 #
-# The lock serialises entry so at most one coroutine at a time computes
-# its wait and records its dispatch time. This makes it *impossible* for
-# two requests to fire closer together than min_gap — no burst can occur.
-#
-# Why not a sliding window?
-#   A sliding window lets N coroutines all "book" slots at t=0, fire them
-#   simultaneously, then all wait ~60 s and repeat — recreating the burst.
-#   A token bucket with per-request spacing eliminates that entirely.
-#
-_last_call_w1: float = 0.0   # time.monotonic() of last w1 dispatch
-_last_call_w2: float = 0.0   # time.monotonic() of last w2 dispatch
-
-_MIN_GAP = 60.0 / RPM_LIMIT  # seconds between requests (e.g. 4.0 s for RPM=15)
-
+_history_w1: deque[float] = deque()
+_history_w2: deque[float] = deque()
 
 async def _acquire_rpm_slot(worker: str) -> None:
     """
     Block until it is safe to fire the next request for `worker`.
-    Guarantees requests are spaced at least _MIN_GAP seconds apart.
+    Guarantees max `rpm_limit` requests in any trailing 60s period.
     """
-    global _last_call_w1, _last_call_w2
+    global _history_w1, _history_w2
 
-    p     = _get_primitives()
-    is_w1 = worker == "worker1"
-    lock  = p["rate_lock_w1"] if is_w1 else p["rate_lock_w2"]
+    p      = _get_primitives()
+    is_w1  = worker == "worker1"
+    lock   = p["rate_lock_w1"] if is_w1 else p["rate_lock_w2"]
+    queue  = _history_w1 if is_w1 else _history_w2
+    limit  = WORKER_1["rpm_limit"] if is_w1 else WORKER_2["rpm_limit"]
 
-    # The lock is held for the entire wait+record cycle.
-    # This serialises all coroutines for this worker — they queue up here
-    # and each one exits exactly _MIN_GAP after the previous one.
     async with lock:
-        now  = time.monotonic()
-        last = _last_call_w1 if is_w1 else _last_call_w2
-        wait = (last + _MIN_GAP) - now
+        now = time.monotonic()
+        
+        # Purge anything older than 60 seconds
+        while queue and (now - queue[0]) >= 60.0:
+            queue.popleft()
 
-        if wait > 0:
-            await asyncio.sleep(wait)
+        # If we hit the limit for this trailing minute, wait out the oldest
+        if len(queue) >= limit:
+            oldest = queue[0]
+            wait = 60.0 - (now - oldest)
+            if wait > 0:
+                await asyncio.sleep(wait)
+            
+            # Repurge in case sleep shifted time
+            now = time.monotonic()
+            while queue and (now - queue[0]) >= 60.0:
+                queue.popleft()
 
-        # Record dispatch time *after* sleeping so the next waiter
-        # measures from when this request actually fires.
-        if is_w1:
-            _last_call_w1 = time.monotonic()
-        else:
-            _last_call_w2 = time.monotonic()
+        # Push the exact firing time to history
+        queue.append(now)
 
 
 # ── URL / short-prompt pre-check ─────────────────────────────
