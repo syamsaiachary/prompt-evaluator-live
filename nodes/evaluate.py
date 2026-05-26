@@ -145,6 +145,8 @@ def _get_llm(worker: str) -> ChatGoogleGenerativeAI:
         model=cfg["model"],
         google_api_key=cfg["api_key"],
         temperature=0,
+        max_retries=0,
+        timeout=60,
     )
 
 
@@ -167,7 +169,13 @@ def _parse_json(response_content: Union[str, list]) -> dict:
     else:
         json_str = text
 
-    return json.loads(json_str)
+    try:
+        return json.loads(json_str)
+    except Exception as e:
+        print(f"[parse_json] Failed to parse JSON: {e}")
+        scores = _empty_scores()
+        scores["task"]["feedback"] = f"LLM returned invalid JSON: {json_str[:50]}..."
+        return scores
 
 
 # ── Main evaluate node ────────────────────────────────────────
@@ -210,53 +218,96 @@ async def evaluate_node(state: WorkerState) -> dict:
     # rather than holding a semaphore slot while waiting.
     await _acquire_rpm_slot(worker)
 
-    # ── Gate 2: concurrency limiter ───────────────────────────
-    async with semaphore:
-        scenario_context = get_scenario_context.invoke({"scenario_type": domain})
+    scenario_context = get_scenario_context.invoke({"scenario_type": domain})
 
-        messages = [
-            SystemMessage(content=SYSTEM_PROMPT),
-            HumanMessage(content=(
-                f"scenario_type: {domain}\n\n"
-                f"Scenario Context:\n{scenario_context}\n\n"
-                f"Submitted Prompt:\n{submitted_prompt}"
-            )),
-        ]
+    messages = [
+        SystemMessage(content=SYSTEM_PROMPT),
+        HumanMessage(content=(
+            f"scenario_type: {domain}\n\n"
+            f"Scenario Context:\n{scenario_context}\n\n"
+            f"Submitted Prompt:\n{submitted_prompt}"
+        )),
+    ]
 
-        llm = _get_llm(worker)
+    llm = _get_llm(worker)
+    scores: dict | None = None
 
-        # Retry with backoff — last-resort safety net if 429 still occurs
-        # Replace the retry block in evaluate_node with this:
-        final_response = None
-        for attempt in range(4):
-            try:
+    for attempt in range(4):
+        try:
+            # ── Gate 2: concurrency limiter — wraps only the LLM call ────────
+            async with semaphore:
                 final_response = await llm.ainvoke(messages)
-                break
+
+            # ── Success path (outside semaphore so slot is freed first) ───────
+            scores = _parse_json(final_response.content)
+
+            print(
+                f"[evaluate] Row {index:04d} | {worker} | "
+                f"domain={domain} | total={scores.get('total', '?')}/50"
+            )
+
+            os.makedirs(CACHE_DIR, exist_ok=True)
+            try:
+                with open(cache_file, "w", encoding="utf-8") as f:
+                    json.dump(scores, f, indent=4)
             except Exception as e:
-                err = str(e)
-                is_retriable = "429" in err or "500" in err or "INTERNAL" in err
-                if is_retriable and attempt < 3:
+                print(f"[evaluate] Row {index:04d} | Failed writing cache: {e}")
+
+            break  # done — exit retry loop
+
+        except Exception as e:
+            err = str(e)
+            is_429     = "429" in err
+            is_retriable = (
+                is_429
+                or "500" in err
+                or "503" in err
+                or "504" in err
+                or "DEADLINE_EXCEEDED" in err
+                or "INTERNAL" in err
+                or "UNAVAILABLE" in err
+                or "TimeoutError" in type(e).__name__
+                or "ReadTimeout" in type(e).__name__
+                or "ConnectTimeout" in type(e).__name__
+                or isinstance(e, asyncio.CancelledError)
+            )
+            if is_retriable and attempt < 3:
+                if is_429:
+                    # Step 1 — honour the server's mandatory cooldown.
+                    m = re.search(r'retry in (\d+(?:\.\d+)?)s', err, re.IGNORECASE)
+                    wait = float(m.group(1)) if m else 60.0
                     print(
-                        f"[evaluate] Row {index:04d} | {e.__class__.__name__} received — "
-                        f"retrying via rate limiter (attempt {attempt + 1}/3)"
+                        f"[evaluate] Row {index:04d} | 429 — cooling down {wait:.0f}s "
+                        f"then re-queuing in rate limiter (attempt {attempt + 1}/3)"
                     )
-                    # Re-acquire a proper rate slot instead of blind sleep
+                    await asyncio.sleep(wait)
+                    # Step 2 — re-enter the rate-limiter queue so this retry is
+                    # counted against the 15 RPM budget just like a fresh call.
+                    # Without this, all retries fire simultaneously after their
+                    # individual sleeps, causing a fresh burst of 429s.
                     await _acquire_rpm_slot(worker)
                 else:
-                    raise
-
-        scores = _parse_json(final_response.content)
-
-        print(
-            f"[evaluate] Row {index:04d} | {worker} | "
-            f"domain={domain} | total={scores.get('total', '?')}/50"
-        )
-
-        os.makedirs(CACHE_DIR, exist_ok=True)
-        try:
-            with open(cache_file, "w", encoding="utf-8") as f:
-                json.dump(scores, f, indent=4)
-        except Exception as e:
-            print(f"[evaluate] Row {index:04d} | Failed writing cache: {e}")
+                    # 500 / 503 / timeout → short backoff, then re-queue.
+                    wait = min(10 * (attempt + 1), 30)
+                    print(
+                        f"[evaluate] Row {index:04d} | {type(e).__name__} — "
+                        f"retrying in {wait}s (attempt {attempt + 1}/3)"
+                    )
+                    await asyncio.sleep(wait)
+                    await _acquire_rpm_slot(worker)
+                continue
+            else:
+                # All retries exhausted or non-retriable error.
+                # Do NOT cache this result — it was an API/network failure,
+                # not a deterministic outcome. The next run should retry it
+                # properly rather than treating the error as a real score.
+                print(
+                    f"[evaluate] Row {index:04d} | ERROR after {attempt + 1} attempt(s) "
+                    f"— flagging row (not cached, will retry next run). Reason: {e}"
+                )
+                scores = _empty_scores()
+                scores["task"]["feedback"] = f"Evaluation error: {e}"
+                # ↑ No cache write here — intentional so a retry run re-evaluates
+                break
 
     return {"results": [{"index": index, "scores": scores}]}

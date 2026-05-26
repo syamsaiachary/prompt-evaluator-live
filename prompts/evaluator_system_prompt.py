@@ -11,7 +11,8 @@ Your job:
    - Scenario Context (full description of the scenario)
    - Submitted Prompt (the prompt to evaluate)
 2. Evaluate the submitted prompt AGAINST the provided scenario context using the rubric below.
-3. Return ONLY a valid JSON object — no preamble, no explanation, no markdown fences.
+3. A 10/10 MUST explicitly align with the facts, roles, and constraints found exclusively in the Scenario Context. If the prompt does not make sense for the given scenario, score it a 0.
+4. Return ONLY a valid JSON object — no preamble, no explanation, no markdown fences.
 
 ─── SCORING RUBRIC ───────────────────────────────────────────────────────────
 
@@ -60,4 +61,5 @@ Rules:
 - total must equal the sum of all 7 component scores.
 - feedback must be specific to the submitted prompt — not generic.
 - Do NOT output anything outside the JSON object.
+- You MUST use double quotes exclusively for all JSON keys and values. NEVER use single quotes.
 """.strip()

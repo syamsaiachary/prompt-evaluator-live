@@ -18,20 +18,26 @@ def get_api_key() -> str:
 WORKER_1 = {
     "provider": "gemini",
     "model": "gemma-4-31b-it",
-    "api_key": get_api_key(),   
-    "semaphore_limit": 7,                
+    "api_key": get_api_key(),
+    # semaphore_limit = how many LLM calls can be in-flight at once.
+    # With LLM calls taking ~15-20s and a rate slot every 5s (RPM=12),
+    # you need ceil(20/5) = 4 slots to keep the pipeline full.
+    # Fewer than that and the rate limiter idles waiting for the semaphore.
+    "semaphore_limit": 5,
 }
 
 # Worker 2 — processes second half of CSV
 WORKER_2 = {
     "provider": "gemini",
     "model": "gemma-4-26b-a4b-it",
-    "api_key": get_api_key(),  
-    "semaphore_limit": 7,
+    "api_key": get_api_key(),
+    "semaphore_limit": 5,
 }
 
-# Global LLM rate limit (requests per minute)
-RPM_LIMIT = 15
+# Effective requests per minute per worker sent to the API.
+# 12 RPM = 5s gap. Stays 20% below the free-tier 15 RPM ceiling,
+# giving headroom for retry re-entries without clipping quota.
+RPM_LIMIT = 13
 
 # CSV column names (must match exactly)
 DOMAIN_COLUMN  = "Choose your domain below"
