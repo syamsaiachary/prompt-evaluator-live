@@ -19,7 +19,9 @@ def _load_pdfs() -> None:
     mapping = {
         "technical":     "technical.pdf",
         "non_technical": "non_technical.pdf",
-        "non technical": "non_technical.pdf",   # handle space variant
+        "assignment1 - req.analysis":  "day-1.pdf",
+        "day-1":  "day-1.pdf",
+        "assignment2 - test plan":  "day-1.pdf"
     }
     for key, filename in mapping.items():
         path = os.path.join(SCENARIO_DIR, filename)
