@@ -57,7 +57,7 @@ RPM_PER_MODEL   = 14        # stay 1 below Google's 15 RPM hard ceiling
 _GAP            = 60.0 / RPM_PER_MODEL   # ~4.29 s between dispatches per model
 _JITTER         = 0.25      # ±random seconds added after each sleep to
                              # prevent two models firing at the same millisecond
-_CONCURRENCY    = 4         # in-flight calls per model  (ceil(15s latency / 4.3s gap))
+_CONCURRENCY    = 10         # in-flight calls per model  (ceil(15s latency / 4.3s gap))
 _LLM_TIMEOUT    = 90        # seconds before a hung call is hard-cancelled
 _MAX_ATTEMPTS   = 4         # total tries per row (1 original + 3 retries)
 
@@ -143,7 +143,7 @@ class ModelWorker:
         self._llm   = ChatGoogleGenerativeAI(
             model=model,
             google_api_key=api_key,
-            temperature=0.1,
+            temperature=0,
             max_retries=0,          # we handle all retries ourselves
             timeout=_LLM_TIMEOUT,
         )

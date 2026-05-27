@@ -27,14 +27,14 @@ WORKER_1 = {
     "api_key":         get_api_key(),
     # semaphore_limit is now managed inside worker_pool.py (_CONCURRENCY = 4).
     # This field is kept for backwards compatibility but ignored by the pool.
-    "semaphore_limit": 4,
+    "semaphore_limit": 7,
 }
 
 WORKER_2 = {
     "provider":        "gemini",
     "model":           "gemma-4-26b-a4b-it",
     "api_key":         get_api_key(),
-    "semaphore_limit": 4,
+    "semaphore_limit": 7,
 }
 
 # RPM_LIMIT is now set inside worker_pool.py (RPM_PER_MODEL = 14).
