@@ -143,7 +143,7 @@ class ModelWorker:
         self._llm   = ChatGoogleGenerativeAI(
             model=model,
             google_api_key=api_key,
-            temperature=0.1,
+            temperature=0,
             max_retries=0,          # we handle all retries ourselves
             timeout=_LLM_TIMEOUT,
         )
