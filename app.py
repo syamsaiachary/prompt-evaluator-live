@@ -442,7 +442,7 @@ with btn_col:
     start  = st.button(
         "🚀 Run Evaluation",
         type="primary",
-        use_container_width=True,
+        width='stretch',
         disabled=no_key,
     )
     if no_key:
@@ -575,7 +575,7 @@ if st.session_state.eval_done and os.path.exists(config.OUTPUT_PATH):
     c6.metric("Flagged",     grade_count("Flagged"))
 
     st.markdown('<div class="section-header" style="margin-top:32px;">Results Preview</div>', unsafe_allow_html=True)
-    st.dataframe(df, use_container_width=True, height=420)
+    st.dataframe(df, width='stretch', height=420)
 
     st.markdown("<br>", unsafe_allow_html=True)
     _, dl_col, _ = st.columns([2, 1, 2])
@@ -587,7 +587,7 @@ if st.session_state.eval_done and os.path.exists(config.OUTPUT_PATH):
                 file_name="indium_evaluated_results.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 type="primary",
-                use_container_width=True,
+                width='stretch',
             )
 
 st.markdown('</div>', unsafe_allow_html=True)
