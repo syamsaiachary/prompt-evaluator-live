@@ -12,34 +12,19 @@ def get_api_key() -> str:
 
 
 # ── Workers ────────────────────────────────────────────────────────────────────
-# Google enforces RPM per MODEL, not per account.
-# Each model below gets its own independent 15 RPM quota.
-# worker_pool.py runs each at 14 RPM → 28 RPM combined → ~9 min for 250 rows.
-#
-# If you have TWO Google accounts with separate API keys you can set
-# WORKER_1_API_KEY and WORKER_2_API_KEY differently for true isolation.
-# With a single account, both keys must be identical — but that's fine
-# because the per-model quotas are still separate.
+# Model names use litellm's format: "gemini/<model-id>"
+# Google enforces RPM per model independently — each gets its own 15 RPM quota.
+# RPM and concurrency are managed inside worker_pool.py.
 
 WORKER_1 = {
-    "provider":        "gemini",
-    "model":           "gemma-4-31b-it",
-    "api_key":         get_api_key(),
-    # semaphore_limit is now managed inside worker_pool.py (_CONCURRENCY = 4).
-    # This field is kept for backwards compatibility but ignored by the pool.
-    "semaphore_limit": 7,
+    "model":   "gemini/gemma-4-31b-it",
+    "api_key": get_api_key(),
 }
 
 WORKER_2 = {
-    "provider":        "gemini",
-    "model":           "gemma-4-26b-a4b-it",
-    "api_key":         get_api_key(),
-    "semaphore_limit": 7,
+    "model":   "gemini/gemma-4-26b-a4b-it",
+    "api_key": get_api_key(),
 }
-
-# RPM_LIMIT is now set inside worker_pool.py (RPM_PER_MODEL = 14).
-# Kept here for reference / legacy imports that may read it.
-RPM_LIMIT = 14
 
 # ── CSV columns ────────────────────────────────────────────────────────────────
 DOMAIN_COLUMN  = "Choose your domain below"

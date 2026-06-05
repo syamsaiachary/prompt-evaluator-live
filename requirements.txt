@@ -9,3 +9,4 @@ langgraph-checkpoint-sqlite
 aiosqlite
 json5
 streamlit
+litellm
