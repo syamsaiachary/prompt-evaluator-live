@@ -337,9 +337,9 @@ if "eval_done" not in st.session_state:
 st.markdown('<div class="upload-card-title">🔑 API Key</div>', unsafe_allow_html=True)
 
 user_api_key = st.text_input(
-    "Google API Key",
+    "Anthropic API Key",
     type="password",
-    placeholder="Paste your Gemini API key here, or leave blank to use the configured default",
+    placeholder="Paste your Claude API key here, or leave blank to use the configured default",
     help="Your key is never stored. It is passed directly to the evaluation process and discarded after the run.",
     label_visibility="collapsed",
 )
@@ -389,8 +389,16 @@ with col_cache:
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("🗑 Clear Cache", key="clear_cache", type="secondary"):
         if os.path.exists(cache_dir):
-            shutil.rmtree(cache_dir)
-            st.success("Cache cleared.")
+            def _ignore_missing(path, exc_info):
+                if exc_info[0] is FileNotFoundError:
+                    return
+                raise exc_info[1]
+
+            try:
+                shutil.rmtree(cache_dir, onerror=_ignore_missing)
+                st.success("Cache cleared.")
+            except Exception as exc:
+                st.error(f"Could not clear cache: {exc}")
         else:
             st.info("Cache is already empty.")
 

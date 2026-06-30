@@ -3,11 +3,10 @@
 #
 #  DESIGN
 #  ──────
-#  Google gives each MODEL its own 15 RPM quota — completely independent of
-#  other models on the same account.  Two models = two separate 15-RPM budgets
-#  = 30 RPM combined ceiling.
+#  Anthropic rate limiting is handled conservatively per configured model.
+#  Two models therefore run with separate pacing to avoid burst-limit issues.
 #
-#  We stay at 14 RPM per model (7% headroom) to absorb retry re-entries.
+#  We stay at 14 RPM per model as a safe default to absorb retry re-entries.
 #  Gap between dispatches = 60 / 14 ≈ 4.3 s per model.
 #
 #  Average LLM latency ≈ 15 s.
@@ -46,7 +45,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from prompts.evaluator_system_prompt import SYSTEM_PROMPT
@@ -140,9 +139,14 @@ class ModelWorker:
         self._lock  = asyncio.Lock()      # serialises rate-slot acquisition
         self._last  = 0.0                 # monotonic time of last dispatch
 
-        self._llm   = ChatGoogleGenerativeAI(
+        print(
+            f"[{self.name}] worker starting model={self.model} "
+            f"api_key_present={'yes' if bool(self.api_key) else 'no'}"
+        )
+
+        self._llm   = ChatAnthropic(
             model=model,
-            google_api_key=api_key,
+            anthropic_api_key=api_key,
             temperature=0,
             max_retries=0,          # we handle all retries ourselves
             timeout=_LLM_TIMEOUT,
@@ -229,7 +233,14 @@ class ModelWorker:
                     or any(k in err for k in (
                         "DEADLINE_EXCEEDED", "INTERNAL", "UNAVAILABLE",
                         "TimeoutError", "ReadTimeout", "ConnectTimeout",
+                        "Connection error", "ConnectionError",
                     ))
+                )
+
+                print(
+                    f"[{self.name}] Row {item.index:04d} | "
+                    f"Exception type={type(e).__name__} "
+                    f"message={repr(err)}"
                 )
 
                 if retriable:

@@ -12,18 +12,13 @@ def get_api_key() -> str:
 
 
 # ── Workers ────────────────────────────────────────────────────────────────────
-# Google enforces RPM per MODEL, not per account.
-# Each model below gets its own independent 15 RPM quota.
-# worker_pool.py runs each at 14 RPM → 28 RPM combined → ~9 min for 250 rows.
-#
-# If you have TWO Google accounts with separate API keys you can set
-# WORKER_1_API_KEY and WORKER_2_API_KEY differently for true isolation.
-# With a single account, both keys must be identical — but that's fine
-# because the per-model quotas are still separate.
+# Anthropic rate limits are enforced per account/model, so the worker pool
+# keeps a conservative spacing strategy for each configured model.
+# worker_pool.py runs each at a safe rate to avoid burst-limit issues.
 
 WORKER_1 = {
-    "provider":        "gemini",
-    "model":           "gemma-4-31b-it",
+    "provider":        "claude",
+    "model":           "claude-4.5-haiku",
     "api_key":         get_api_key(),
     # semaphore_limit is now managed inside worker_pool.py (_CONCURRENCY = 4).
     # This field is kept for backwards compatibility but ignored by the pool.
@@ -31,8 +26,8 @@ WORKER_1 = {
 }
 
 WORKER_2 = {
-    "provider":        "gemini",
-    "model":           "gemma-4-26b-a4b-it",
+    "provider":        "claude",
+    "model":           "claude-4.5-haiku",
     "api_key":         get_api_key(),
     "semaphore_limit": 7,
 }
