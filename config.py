@@ -18,7 +18,7 @@ def get_api_key() -> str:
 
 WORKER_1 = {
     "provider":        "claude",
-    "model":           "claude-4.5-haiku",
+    "model":           "claude-haiku-4-5",
     "api_key":         get_api_key(),
     # semaphore_limit is now managed inside worker_pool.py (_CONCURRENCY = 4).
     # This field is kept for backwards compatibility but ignored by the pool.
@@ -27,7 +27,7 @@ WORKER_1 = {
 
 WORKER_2 = {
     "provider":        "claude",
-    "model":           "claude-4.5-haiku",
+    "model":           "claude-haiku-4-5",
     "api_key":         get_api_key(),
     "semaphore_limit": 7,
 }
@@ -49,7 +49,7 @@ CACHE_DIR      = ".eval_cache"
 # ── Grade bands ────────────────────────────────────────────────────────────────
 GRADE_BANDS = {
     "Excellent":          (40, 50),
-    "Good":               (30, 39),
+    "Good":               (30, 39), 
     "Needs Improvement":  (20, 29),
     "Poor":               (0,  19),
 }
