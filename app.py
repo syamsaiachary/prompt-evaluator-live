@@ -389,16 +389,8 @@ with col_cache:
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("🗑 Clear Cache", key="clear_cache", type="secondary"):
         if os.path.exists(cache_dir):
-            def _ignore_missing(path, exc_info):
-                if exc_info[0] is FileNotFoundError:
-                    return
-                raise exc_info[1]
-
-            try:
-                shutil.rmtree(cache_dir, onerror=_ignore_missing)
-                st.success("Cache cleared.")
-            except Exception as exc:
-                st.error(f"Could not clear cache: {exc}")
+            shutil.rmtree(cache_dir)
+            st.success("Cache cleared.")
         else:
             st.info("Cache is already empty.")
 
