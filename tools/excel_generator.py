@@ -53,7 +53,7 @@ def  generate_excel(results: list[dict], original_rows: list[dict]) -> str:
             f"Persona: {s.get('persona', {}).get('score', 0)}/10\n"
             f"Output: {s.get('output', {}).get('score', 0)}/10\n"
             f"Examples: {s.get('examples', {}).get('score', 0)}/4\n"
-            f"About You: {s.get('about_you', {}).get('score', 0)}/4\n"
+            f"About You: {s.get('about_you', {}).get('score', 0)}/3\n"
             f"Target Audience: {s.get('tg', {}).get('score', 0)}/3"),
             "Grade & Total Score": f"{grade_str} ({display_score})",
             "Feedback": f"{s.get('three_sentence_feedback','')}"
